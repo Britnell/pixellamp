@@ -14,6 +14,7 @@ const io = require('socket.io')(server);
 
 // * drawing modules
 const Drawing = require('./drawing.js');
+
 var draw = new Drawing();
 // draw.start();
 
@@ -46,40 +47,41 @@ io.on('connection', (socket)=>{
 
   socket.on('lamp',(data)=>
   {
-    // console.log(' #socket>Lamp : ', data );
     if(data.hasOwnProperty('set-col'))
     {
       // Set colour
       let col = data['set-col'];
-      if( col.length == 3){
-        // clean
-        draw.col = {
-        	h: col[0],
-        	s: col[1],
-        	v: col[2]
-        }
-        draw.redraw();
-        // Eo set col
-      }
+      draw.setColour(col);
     }
     else if(data.hasOwnProperty('get-col'))
     {
-      console.log(' GET COL');
+      // console.log(' GET COL');
       socket.emit('lamp',{'get-col': draw.col });		//[Hue,1,Bright] });
     }
     else if(data.hasOwnProperty('get-mode'))
     {
-    	console.log(' GET mode ');
-      socket.emit('lamp',{'get-mode': {n: draw.mode, mode: draw.current, max: draw.modes.length  }} );
+      let prev;
+      if(draw.mode==0)        prev = draw.modes.length-1;
+      else                    prev = draw.mode-1;
+      socket.emit('lamp',{'get-mode': {n: draw.mode, mode: draw.current, prev: draw.modes[prev] ,max: draw.modes.length  }} );
     }
     else if(data.hasOwnProperty('set-mode'))
     {
         // * Set mode
-        console.log(' set mode ');
         draw.setMode(data['set-mode']['n']);
-        socket.emit('lamp',{'get-mode': {n: draw.mode, mode: draw.current, max: draw.modes.length  }} );
-        draw.redraw();
-      // }
+        let prev;
+        if(draw.mode==0)        prev = draw.modes.length-1;
+        else                    prev = draw.mode-1;
+        socket.emit('lamp',{'get-mode': {n: draw.mode, mode: draw.current, prev: draw.modes[prev] ,max: draw.modes.length  }} );
+    }
+    else if(data.hasOwnProperty('get-invert'))
+    {
+      draw.Invert();
+      socket.emit('lamp',{'get-invert': draw.Invert() });
+    }
+    else if(data.hasOwnProperty('invert')){
+      let inv = draw.Invert();
+      socket.emit('lamp',{'get-invert': inv }); 
     }
     // Eo socket
   });

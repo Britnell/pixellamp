@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Socket Comms</title>
+    <title>Pixel Lamp</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
@@ -13,7 +13,7 @@
         /******/
         #square {
             width: 100%;
-            height: 500px;
+            height: 60vh;
             background-color: white;
             left: 0;
             top: 0;
@@ -26,10 +26,33 @@
             background-color: white;
         }
 
-        #mode{
-            font-size: 30px;
+        #buttoncontainer {
+            max-width: 600px;
+            margin-left: 10%;
+        }
+
+        .modebuttons{
             text-align: center;
-            padding: 20px;
+            padding: 20px 40px;
+            display: inline-block;
+            position: absolute;
+        }
+
+        #mode {
+            left: 40%;
+            font-size: 30px;
+        }
+
+        #prev {
+            left: 10%;
+            font-size: 18px;
+        }
+
+        #invert {
+            font-size: 16px;
+            left: 70%;
+            padding: 20px 40px;
+
         }
 
     </style>
@@ -39,11 +62,17 @@
 
     <div id="square"><div id="marker"></div></div>
 
-    <div id="mode">MODE</div>
+<div id="buttoncontainer">
+    <div class="modebuttons" id="prev">MODE</div>
+    <div class="modebuttons" id="mode">MODE</div>
     
+    <div class="modebuttons" id="invert">Invert</div>
+</div>
     <script src="/socket.io/socket.io.js"></script>
 
     <script type="text/javascript">
+
+        
 
     	// Connect
     	var serverAddr = 'http://smartpi:8000';
@@ -52,7 +81,7 @@
 
     	socket.on('connect', ()=>{
     		console.log('connected Socket ');
-	        socket.emit('msg', 'Hey socket, lamp interface here. ');
+	        // socket.emit('msg', 'Hey socket, lamp interface here. ');
 	      });
 
         socket.on('msg',(data)=>{
@@ -67,22 +96,39 @@
                 bright = col.v *100;
                 set_HSV(hue, bright );
                 set_marker(hue, bright );
-                // let hsv = rgb_to_hsv(col);
-                // let hsv = col;
-                // let rgb = HSVtoRGB(hsv[0],hsv[1],hsv[2]);
-                // square.style.backgroundColor = '#'+rgbToHex(rgb[0])+rgbToHex(rgb[1])+rgbToHex(rgb[2]);
             }
             if(data.hasOwnProperty('get-mode')){
-                let mod = $('#mode')[0];
-                // if(data['get-mode'].hasOwnProperty('mode'))
-                mod.textContent = data['get-mode']['mode'];
+                $('#mode')[0].textContent = data['get-mode']['mode'];
                 lampmode = data['get-mode']['n'];
                 lampMax = data['get-mode']['max'];
+                $('#prev')[0].textContent = data['get-mode']['prev'];
                 // console.log(' get mode : ', data );
+            }
+
+            if(data.hasOwnProperty('get-invert')){
+                invert = data['get-invert'];
+                if(invert){
+                    $invert.style.backgroundColor = 'black';
+                    $invert.style.color = 'white';
+                }
+                else {
+                    $invert.style.backgroundColor = 'white';
+                    $invert.style.color = 'black';   
+                }
+                // console.log(' INV ', invert )
             }
 
             // Eo socket[ lamp ]
         });
+
+        // * invert button
+
+        
+        var invert;
+        var $invert = $('#invert')[0];
+        $invert.onclick = function(){
+            socket.emit('lamp',{'invert': 1});
+        }
 
         // ***
         var lampmode = 0;
@@ -93,6 +139,15 @@
             socket.emit('lamp',{'set-mode':{ n: lampmode } } );
             // lamp auto replies with new mode
         }
+
+        $('#prev')[0].onclick = function(){
+            if(lampmode==0)
+                lampmode = lampmode-1;
+            else
+                lampmode--;
+            socket.emit('lamp',{'set-mode':{ n: lampmode } } );
+        }
+
         // **** Hamemrtime
 
         var square = document.getElementById('square');
@@ -101,25 +156,43 @@
 
         var lastPan = {deltaX:0, deltaY:0 };
 
+        // mc.on("panleft panright panup pandown tap press", function(ev) {
+        //     // console.log( ev.deltaX, ev.deltaY, ev.direction );
+
+        //     // X - hue
+        //     let diff = ev.deltaX - lastPan.deltaX;
+        //     hue += diff/8;
+        //     if(hue<0)   hue += 360;
+        //     if(hue>360) hue -= 360;
+
+        //     // Y - bright
+        //     diff = ev.deltaY - lastPan.deltaY;
+        //     bright -= diff/10;
+        //     if(bright<0)    bright = 0;
+        //     if(bright>100)  bright = 100;
+
+        //     set_HSV(hue,bright); // <360 , <100
+        //     set_marker(hue,bright);
+
+        //     lastPan = ev;
+        // });
+
+        var pan = { x: 0, y: 0 };
+
         mc.on("panleft panright panup pandown tap press", function(ev) {
-            // console.log( ev.deltaX, ev.deltaY, ev.direction );
+            // 
+            pan.x += (ev.deltaX-lastPan.deltaX) /8;
+            pan.y += (ev.deltaY-lastPan.deltaY) /8;
+            if(pan.x<0)     pan.x += 100;
+            if(pan.x>100)   pan.x -= 100;
+            if(pan.y<0)     pan.y = 0;
+            if(pan.y>100)   pan.y = 100;
 
-            // X - hue
-            let diff = ev.deltaX - lastPan.deltaX;
-            hue += diff/12;
-            if(hue<0)   hue += 360;
-            if(hue>360) hue -= 360;
+            //
+            pan_to_col(pan);
 
-            // Y - bright
-            diff = ev.deltaY - lastPan.deltaY;
-            bright -= diff/10;
-            if(bright<0)    bright = 0;
-            if(bright>100)  bright = 100;
-
-            set_HSV(hue,bright); // <360 , <100
-            set_marker(hue,bright);
-
-            lastPan = ev;
+            //
+            lastPan = ev;   
         });
 
         mc.on("panend",(ev)=>{
@@ -127,16 +200,60 @@
             lastPan = {deltaX:0, deltaY:0 };
         });
 
-        function set_marker(hue,bright){
+        function pan_to_col(pan){
+            
+            const yDiv = 20;
+            const satMin = 50;
+            let hue, sat, bright;
+            hue = pan.x;    
+
+            if(pan.y>yDiv){
+                sat = 100;
+                bright = scale(pan.y, yDiv,100, 100,0 );
+                //
+            }
+            else {
+                sat = scale(pan.y, 0,yDiv, satMin,100 );
+                bright = 100;
+            }
+
+            // console.log( hue, sat, bright );
+            set_HSV(hue,sat,bright);
+            set_marker(pan.x,pan.y);
+
+            // Eo f()
+        }
+
+        function set_marker(x,y){
             let M = $('#marker')[0];
-            M.style.left = (100*hue/360)+'%';
-            M.style.top = (90-90*bright/100)+'%';
+            M.style.left = (x)+'%';
+            M.style.top = (y*0.85)+'%';
         }
 
         // * Pan
-        var colour = [ 255, 0, 0 ];
-        var hue = 0;
-        var bright = 100;
+
+        function scale(x,min,max,ymin,ymax){
+            let prop = (x - min) / (max-min);
+            return ymin + prop * (ymax-ymin);
+        }
+
+        function set_HSV(hue,sat,bright){
+            hue /= 100;
+            sat /= 100;
+            bright /= 100;
+            var rgb = HSVtoRGB(hue, sat, bright);
+            var hex = '#'+rgbToHex(rgb.r)+rgbToHex(rgb.g)+rgbToHex(rgb.b);
+            square.style.backgroundColor = hex;
+            socket.emit('lamp',{'set-col': { h: hue, s:sat, v: bright } } );
+        }
+
+
+        function set_HSV2(hue, bright){
+            var rgb = HSVtoRGB(hue/360,1,bright/100);
+            var hex = '#'+rgbToHex(rgb.r)+rgbToHex(rgb.g)+rgbToHex(rgb.b);
+            square.style.backgroundColor = hex;
+            socket.emit('lamp',{'set-col': { h: hue/360, s:1, v: bright/100 } } );
+        }
 
         function rgb_to_hsv(rgb){
             // Make r, g, and b fractions of 1
@@ -183,20 +300,6 @@
         }   
         
 
-        function set_color(hue){
-            var rgb = HSVtoRGB(hue/360,1,1);
-            var hex = '#'+rgbToHex(rgb.r)+rgbToHex(rgb.g)+rgbToHex(rgb.b);
-            square.style.backgroundColor = hex;
-            socket.emit('lamp',{'set-col': [rgb.r,rgb.g,rgb.b] } );
-        }
-
-        function set_HSV(hue, bright){
-            var rgb = HSVtoRGB(hue/360,1,bright/100);
-            var hex = '#'+rgbToHex(rgb.r)+rgbToHex(rgb.g)+rgbToHex(rgb.b);
-            square.style.backgroundColor = hex;
-            // socket.emit('lamp',{'set-col': [rgb.r,rgb.g,rgb.b] } );
-            socket.emit('lamp',{'set-col': [ hue/360, 1, bright/100] } );
-        }
 
         // inputs all 0 <= x <= 1
         function HSVtoRGB(h, s, v) {
@@ -237,7 +340,10 @@
 
         socket.emit('lamp', {'get-mode': 1 });
 
-        // set_color(hue);
+        socket.emit('lamp', {'get-invert': 1 });
+
+
+
     	
     </script>
 </body>

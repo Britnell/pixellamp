@@ -1,45 +1,89 @@
 
-const statics = require('./static.js');
+const statics = require('./static.js');	// Object for static drawings
+const systems = require('./systems.js');
+
 // * serial usb port module
 const Usb = require('./usb.js');
 const Pixel = require('./pixel.js');
+const rgb = require('./rgb.js');
+
 var leds;
+
+const staticFR = 80;
+const staticList = [ 'Radial', 'Axial','Crescent', 'Eclipse', 
+				   'Stripes', 'Hatched','Dots', 
+				   'Trigs',  'Triangle',	
+				   // 'Nest','Star', 
+				   'Square', 'Cross', 'Half', 'Full', 'Xmas' ];	// 
+
+const animFR = 20;
+const animList = [ 'Firework', 'Hexaton', 'Growth', 'Snow' ];
 
 
 class Drawing{
 
 	constructor(){
-		this.col = { h: 0, s: 1, v: 0.5 };
-		this.FR = 0;
-		this.modes = [ 'RADIAL', 'RADIAL_INV', 'STRIPES', 'HATCHED', 'CRESCENT', 'ECLIPSE', 'SQUARE', 'CROSS' ];	// 'FULL',
-		this.mode = this.modes.length-1;
-		// 
-		this.pixels = Pixel();	// create disc pixel
+		this.FR = 0;	// LIES this FrameRate is actually the period
+
+		this.modes = [];
+		this.modes = this.modes.concat(staticList);
+		this.modes = this.modes.concat(animList );
+
+ 		this.mode = 0;//this.modes.length-1;
+		// create pixels array 
+		this.pixels = Pixel();
+		// create usb connection
 		leds = new Usb(()=>{
 			console.log(' SERIAL CONN ');
+			this.timer = null;
 			this.setMode(this.mode);
+			this.tick();
 		});
-		
-		//
+		// create color gradient 
+		this.gradient = new rgb.Gradient();
+		this.gradient.xscale = 0.3;
+		this.gradient.yscale = 0.9;
+		this.gradient.hueDiff = 0.1;
+		this.setColour({ h:0, s:1, v: 0.5 });
+
+		// 
+	}
+
+	getInvert(){
+		return statics.inverted;
+	}
+
+	Invert(){
+		return statics.invert();
+		// console.log(' INVERT : ', statics.inverted )
+	}
+
+	setColour(hsv){
+		this.col = hsv;	// monotone 
+		this.gradient.setColour(hsv);	// gradient
 	}
 
 	setMode(n){
 		this.mode = n;
 		this.current = this.modes[n];
-		// * STATIC
-		if(['RADIAL', 'RADIAL_INV', 'STRIPES', 'HATCHED', 'CRESCENT','SQUARE', 'CROSS' ].includes(this.current) ){
-			this.FR = 0;
-			this.redraw();
+		
+		// * Statics , slower
+		if(staticList.includes(this.current)){
+			this.FR = staticFR;
 		}
-		else 	// * SLOW
-		if(['ECLIPSE'].includes(this.current)){
-			this.FR = 80;
-			this.tick();
+		else if(animList.includes(this.current)){
+			this.FR = animFR;
 		}
-		else{	// * ANIMATION
-			this.FR = 20;
-			this.tick()
-		}
+
+		if(this.current=='Firework')
+			systems.new_rings();
+		else if(this.current=='Hexaton')
+			systems.init_automaton(this.pixels,this.gradient);
+		else if(this.current=='Growth')
+			systems.init_tree(this.pixels,this.gradient);
+		else if(this.current=='Snow')
+			systems.init_snow(this.pixels,this.gradient);
+		
 	}
 
 	redraw(){
@@ -48,50 +92,82 @@ class Drawing{
 	}
 
 	tick() {
-		setTimeout( ()=>{ this.draw() } ,this.FR);
+		if(this.FR!=0)
+			this.tier = setTimeout( ()=>{ this.draw() } ,this.FR);
 	}
 
 	draw()
 	{
-		// console.log(' DRAW ', this.current, this.FR );
-
+		// console.log(' DRAW ');
 		// * Different drawings
-		if(this.current=='RADIAL'){	
-			statics.radial(this.pixels, this.col);		// * Radial
+		if(this.current=='Radial'){	
+			statics.radial(this.pixels, this.gradient);		// * Radial
 		}
-		else if(this.current=='RADIAL_INV'){	
-			statics.radial_inv(this.pixels, this.col);		// * Radial inv
+		else if(this.current=='Full'){	
+			statics.full(this.pixels, this.gradient);		// * Full
 		}
-		// else if(this.current=='FULL'){	
-		// 	statics.full(this.pixels, this.col);		// * Full
-		// }
-		else if(this.current=='STRIPES'){	
-			statics.stripes(this.pixels, this.col);		// * Stripes
+		else if(this.current=='Stripes'){	
+			statics.stripes(this.pixels, this.gradient);		// * Stripes
 		}
-		else if(this.current=='HATCHED'){	
-			statics.hatch(this.pixels, this.col);		// * Hatched
+		else if(this.current=='Hatched'){	
+			statics.hatch(this.pixels, this.gradient);		// * Hatched
 		}
-		else if(this.current=='CRESCENT'){	
-			statics.crescent(this.pixels, this.col);
+		else if(this.current=='Crescent'){	
+			statics.crescent(this.pixels, this.gradient);
 		}
-		else if(this.current=='ECLIPSE'){	
-			statics.eclipse(this.pixels, this.col);
+		else if(this.current=='Eclipse'){	
+			statics.eclipse(this.pixels, this.gradient);
 			statics.move_eclipse();
 		}
-		else if(this.current=='SQUARE'){	
-			statics.square(this.pixels, this.col);
+		else if(this.current=='Square'){	
+			statics.square(this.pixels, this.gradient);
 		}
-		else if(this.current=='CROSS'){	
-			statics.cross(this.pixels, this.col);
+		else if(this.current=='Triangle'){	
+			statics.triangle(this.pixels, this.gradient);
 		}
-		
+		else if(this.current=='Cross'){	
+			statics.cross(this.pixels, this.gradient);
+		}
+		else if(this.current=='Axial'){	
+			statics.quarter(this.pixels, this.gradient);
+		}
+		else if(this.current=='Dots'){
+			statics.dots(this.pixels, this.gradient);
+		}
+		else if(this.current=='Trigs'){
+			statics.trigs(this.pixels, this.gradient);
+		}
+		else if(this.current=='Half'){
+			statics.half(this.pixels, this.gradient);
+		}
+		else if(this.current=='Star'){
+			statics.star(this.pixels, this.gradient);
+		}
+		else if(this.current=='Nest'){
+			statics.nest(this.pixels, this.gradient);
+		}
+		else if(this.current=='Xmas'){
+			statics.xmas(this.pixels, this.gradient);
+		}
+		// * SYSTEMS
+		else if(this.current=='Firework'){
+			systems.rings(this.pixels, this.gradient);
+		}
+		else if(this.current=='Hexaton'){
+			systems.automaton(this.gradient);
+		}
+		else if(this.current=='Growth'){
+			systems.draw_tree(this.gradient);
+		}
+		else if(this.current=='Snow'){
+			systems.snows();
+		}
 
 		// * Send
 		leds.send_pixels(this.pixels);
 
-		if(this.FR!=0){
-			this.tick();
-		}
+		this.tick();
+		
 	}
 	// Eo class
 }
